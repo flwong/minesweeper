@@ -1,0 +1,296 @@
+<html>
+<head>
+<style>
+    .space {
+        position: absolute;
+        margin: auto;
+        left: 0;
+        right: 0;
+        /*background-color: yellow;*/
+        text-align: center;
+    }
+    .content {
+        position: relative;
+        margin: auto;
+        /*width: 100%;*/
+        /*background-color: yellow;*/
+        text-align: center;
+    }
+    .center {
+        margin-left: auto;
+        margin-right: auto;
+    }
+    img.overlay {
+        margin:0;
+        /*
+        position:absolute;
+        left:0;
+        right:0;
+        */
+        object-fit: contain;
+        max-width:100%;
+        max-height:100%;
+        /*width: 800px;*/
+    }
+    table {
+        border: 1px solid;
+        background-color: lightgray;
+        margin: 10px; padding: 10px;
+        cursor:pointer;
+        visibility: hidden;
+    }
+    th, td {
+        /* border: 1px solid; */
+        padding: 0px;
+        /* width: 20px; height: 20px; */
+        text-align: center;
+        background-color: lightgray;
+        margin: 0px; padding: 0; border-spacing: none;
+    }
+    .tile {
+        /*border: 1px outset blue;
+        background-color: lightBlue;*/
+        /*outline: none;
+        box-shadow: 0;
+        border: 1px solid black;
+        border-radius: 0px;*/
+        text-align: center;
+        height:30px;
+        width:30px;
+        font-size: 20px;
+        padding:0px;
+        color: black;
+        cursor:pointer;
+        /*box-shadow: 0 2px #666;*/
+    }
+    /*
+    .tile:active {
+        box-shadow: 0 0px #666;
+        transform: translateY(2px);
+    }
+    */
+</style>
+<script>
+TEXTCOLOR = ['lightgray', 'black', 'blue', 'green', 'red', 'brown', 'purple', 'cyan', 'darkgray']
+GRID_OPTIONS = [[5, 7],[9,27],[20, 60]]
+var gridSize;
+var numMines;
+var freeSpace;
+var grid;
+var IN_PLAY = false;
+
+// Disable context menu (right click) on the page
+window.addEventListener('contextmenu', (event) => {
+  event.preventDefault()
+});
+
+// From https://stackoverflow.com/questions/966225/how-can-i-create-a-two-dimensional-array-in-javascript/966938#966938
+function createArray(length) {
+    var arr = new Array(length || 0),
+        i = length;
+
+    if (arguments.length > 1) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        while(i--) arr[length-1 - i] = createArray.apply(this, args);
+    }
+
+    return arr;
+}
+
+function incrementCount(x, y) {
+    if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
+        grid[x][y].count++;
+    }
+}
+
+function plantMine(num) {
+    var limit = gridSize * gridSize;
+    if (num >= limit) {
+        num = limit;
+    }
+    for (k = 0; k < num; k++) {
+        while (true) {
+            var index = Math.floor(Math.random() * limit);
+            var i = Math.floor(index / gridSize);
+            var j = Math.floor(index % gridSize);
+            if (grid[i][j].isMine == 0) {
+                grid[i][j].isMine = 1;
+                incrementCount(i - 1, j - 1);
+                incrementCount(i - 1, j);
+                incrementCount(i - 1, j + 1);
+                incrementCount(i, j - 1);
+                incrementCount(i, j + 1);
+                incrementCount(i + 1, j - 1);
+                incrementCount(i + 1, j);
+                incrementCount(i + 1, j + 1);
+                freeSpace--;
+                break;
+            }
+        }
+    }
+}
+
+function generateField() {
+    const index=parseInt(document.getElementById("sizeList").value);
+    gridSize = GRID_OPTIONS[index][0];
+    numMines = GRID_OPTIONS[index][1];
+    grid = createArray(gridSize, gridSize);
+    for (i = 0; i < gridSize; i++) {
+        for (j = 0; j < gridSize; j++) {
+            grid[i][j] = {"count":0, "isMine":0, "state":0 }
+        }
+    }
+    freeSpace = gridSize * gridSize;
+    plantMine(numMines);
+
+    renderGrid();
+    IN_PLAY = true;
+    console.log("minefield width: " + document.getElementById("minefield").offsetWidth);
+    document.getElementById("kaboom").style.visibility = "hidden";
+    document.getElementById("kaboom").style.width = document.getElementById("minefield").offsetWidth;
+    document.getElementById("confetti").style.visibility = "hidden";
+    document.getElementById("confetti").style.height = document.getElementById("minefield").offsetHeight;
+
+    // debugging only
+    // document.getElementById("message").innerHTML = getTextGrid();
+}
+
+function revealTile(posX, posY) {
+    const x = parseInt(posX);
+    const y = parseInt(posY);
+    console.log("revealing Tile: (" + x + "," + y + ")");
+    if (x >= 0 && x < gridSize && y >= 0 && y < gridSize) {
+        if (grid[x][y].state != 2) { // Not already revealed
+            buttonElement = document.getElementById("T" + x + "_" + y);
+            if (grid[x][y].isMine) {
+                //document.getElementById("minefield").style.visibility = "hidden";
+                document.getElementById("kaboom").style.visibility = "visible";
+                setTimeout(
+                    function(){
+                        document.getElementById("kaboom").style.visibility = "hidden";
+                        //document.getElementById("minefield").style.visibility = "visible";
+                    }, 1000);
+                buttonElement.value = "\uD83D\uDCA3"; // https://www.fileformat.info/info/unicode/char/1f4a3/index.htm
+                buttonElement.style.backgroundColor = "red";
+                // Game over
+                grid[x][y].state = 2;
+                IN_PLAY = false;
+                document.getElementById("message").innerHTML = "You Lose!";
+            } else {
+                const count = grid[x][y].count;
+                buttonElement.value = count;
+                buttonElement.style.color = TEXTCOLOR[count];
+                buttonElement.disabled = true;
+                freeSpace--;
+                grid[x][y].state = 2; // revealed
+                if (freeSpace == 0) {
+                    //document.getElementById("minefield").style.visibility = "hidden";
+                    document.getElementById("confetti").style.visibility = "visible";
+                    // Just leave the confetti anime GIF on
+                    /*
+                    setTimeout(
+                        function(){
+                            document.getElementById("confetti").style.visibility = "hidden";
+                            //document.getElementById("minefield").style.visibility = "visible";
+                        }, 2000);
+                    */
+                    // Win
+                    IN_PLAY = false;
+                    document.getElementById("message").innerHTML = "You Win!";
+                }
+                if (count == 0) {
+                    // recursively open adjacent ones
+                    revealTile(x - 1, y - 1);
+                    revealTile(x    , y - 1);
+                    revealTile(x + 1, y - 1);
+                    revealTile(x - 1, y    );
+                    revealTile(x + 1, y    );
+                    revealTile(x - 1, y + 1);
+                    revealTile(x    , y + 1);
+                    revealTile(x + 1, y + 1);
+                }
+            }
+        }
+    }
+}
+
+function tileClick(e) {
+    if (IN_PLAY) {
+        tileElement = e.currentTarget.attributes;
+        // e.button (0 = left; 1=middle; 2=right; etc.)
+        var x = tileElement.x.value;
+        var y = tileElement.y.value;
+        buttonElement = document.getElementById("T" + x + "_" + y);
+        console.log("Button " + e.button + ":" + x + "," + y);
+        if (e.button == 0) { // Left click
+            revealTile(x, y);
+        } else if (e.button == 2) { // Right click
+            if (grid[x][y].state != 2) { // already revealed
+                if (grid[x][y].state == 0) {
+                    grid[x][y].state = 1; // Flag as bomb
+                    buttonElement.value = "\uD83D\uDEA9"; //https://www.fileformat.info/info/unicode/char/1f6a9/index.htm
+                } else if (grid[x][y].state == 1) {
+                    grid[x][y].state = 0; // Clear the flag
+                    buttonElement.value = "";
+                }
+            }
+        }
+    }
+}
+
+function renderGrid() {
+    var output = "";
+    var tileID;
+    for (i = 0; i < gridSize; i++) {
+        output += "<tr>"
+        for (j = 0; j < gridSize; j++) {
+            tileID = "T" + i + "_" + j;
+            output += "<td><input id='" + tileID + "' class='tile' type='button'/></td>";
+        }
+        output += "</tr>";
+    }
+    document.getElementById("minefield").innerHTML = output;
+    document.getElementById("minefield").style.visibility = "visible";
+    // Need the elements to exist first!
+    for (i = 0; i < gridSize; i++) {
+        for (j = 0; j < gridSize; j++) {
+            tileID = "T" + i + "_" + j;
+            ele = document.getElementById(tileID);
+            ele.setAttribute('x', i);
+            ele.setAttribute('y', j);
+            ele.addEventListener('mouseup', function (e) {tileClick(e)});
+        }
+    }
+}
+
+function getTextGrid() {
+    var output = "";
+    for (i = 0; i < gridSize; i++) {
+        for (j = 0; j < gridSize; j++) {
+            output = output + (grid[i][j].isMine?"B":grid[i][j].count) + "&nbsp;";
+        }
+        output = output + "<br/>";
+    }
+    return output;
+}
+</script>
+</head>
+<!-- Disable selecting (thus highlighting) text -->
+<body onselectstart="return false">
+    <div id="container" class="content">
+        <!-- free image from http://clipart-library.com/clipart/773536.htm -->
+        <!--<img id="kaboom" class="overlay" src="773536.png" style="visibility: hidden;"/>-->
+        <div id="kaboom" class="space" style="visibility: hidden;"><img class="overlay" src="773536.png"/></div>
+        <!-- free image from https://acegif.com/gif/confetti-29/ -->
+        <div id="confetti" class="space" style="visibility: hidden;"><img class="overlay" src="confetti-29.gif"/></div>
+        <table id="minefield" class="center" cellspacing="0" cellpadding="0"></table>
+        <select id="sizeList">
+            <option value="0">Small</option>
+            <option value="1">Medium</option>
+            <option value="2">Large</option>
+        </select>
+        <button onclick="generateField();">Start!</BUTTON><br/>
+        <p id="message"></p>
+    </div>
+</body>
+</html>
